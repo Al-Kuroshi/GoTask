@@ -1,0 +1,8 @@
+clickup:
+  api_token: ""
+  team_id: ""
+github:
+  repo_path: "/home/daslaptop/whatsclickhub"
+  token_env: "GITHUB_TOKEN"
+db:
+  path: "./gotask.db"
