@@ -4,11 +4,27 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/Al-Kuroshi/GoTask/internal/clickup"
 	"gopkg.in/yaml.v3"
 )
+
+// formatEpochMillis converts a ClickUp epoch-millisecond timestamp string into
+// RFC3339 for readability in the ledger. Returns the input unchanged if it's
+// empty or not parseable.
+func formatEpochMillis(s string) string {
+	if s == "" {
+		return ""
+	}
+	ms, err := strconv.ParseInt(s, 10, 64)
+	if err != nil {
+		return s
+	}
+	return time.UnixMilli(ms).UTC().Format(time.RFC3339)
+}
 
 type Provenance struct {
 	ReassignedFrom string `yaml:"reassigned_from,omitempty"`
@@ -50,10 +66,10 @@ func WriteTaskDir(worktreePath string, t clickup.Task, comments []clickup.Commen
 		Title:       t.Name,
 		Status:      t.Status.Status,
 		Priority:    t.Priority.String(),
-		DueDate:     t.DueDate,
+		DueDate:     formatEpochMillis(t.DueDate),
 		Assignee:    assigneeUsername,
-		CreatedAt:   t.DateCreated,
-		UpdatedAt:   t.DateUpdated,
+		CreatedAt:   formatEpochMillis(t.DateCreated),
+		UpdatedAt:   formatEpochMillis(t.DateUpdated),
 		Attachments: attachmentNames,
 	}
 	yamlBytes, err := yaml.Marshal(taskYAML)
@@ -113,7 +129,7 @@ func writeAttachments(dir string, attachments []clickup.Attachment, download Dow
 func renderComments(comments []clickup.Comment) string {
 	var b strings.Builder
 	for _, c := range comments {
-		fmt.Fprintf(&b, "## %s — %s\n\n%s\n\n", c.User.Username, c.Date, c.CommentText)
+		fmt.Fprintf(&b, "## %s — %s\n\n%s\n\n", c.User.Username, formatEpochMillis(c.Date), c.CommentText)
 	}
 	return b.String()
 }

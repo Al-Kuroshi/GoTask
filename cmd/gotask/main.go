@@ -21,6 +21,8 @@ func main() {
 	switch os.Args[1] {
 	case "register-assignee":
 		cmdRegisterAssignee(os.Args[2:])
+	case "sync-assignee":
+		cmdSyncAssignee(os.Args[2:])
 	default:
 		usage()
 		os.Exit(1)
@@ -29,6 +31,42 @@ func main() {
 
 func usage() {
 	fmt.Fprintln(os.Stderr, "usage: gotask register-assignee -clickup-user-id ID -clickup-username NAME [-github-user NAME] [-whatsapp NUMBER] [-config PATH]")
+	fmt.Fprintln(os.Stderr, "       gotask sync-assignee -assignee-id ID [-config PATH]")
+}
+
+func cmdSyncAssignee(args []string) {
+	fs := flag.NewFlagSet("sync-assignee", flag.ExitOnError)
+	assigneeID := fs.Int64("assignee-id", 0, "assignee DB id (required)")
+	configPath := fs.String("config", "config.yaml", "path to config file")
+	fs.Parse(args)
+
+	if *assigneeID == 0 {
+		fmt.Fprintln(os.Stderr, "error: -assignee-id is required")
+		os.Exit(1)
+	}
+
+	cfg, err := config.Load(*configPath)
+	if err != nil {
+		fatal(err)
+	}
+	database, err := db.Open(cfg.DB.Path)
+	if err != nil {
+		fatal(err)
+	}
+	defer database.Close()
+
+	token, err := cfg.GitHubToken()
+	if err != nil {
+		fatal(err)
+	}
+	repo := gitrepo.New(cfg.GitHub.RepoPath, token)
+	cu := clickup.NewClient(cfg.ClickUp.APIToken)
+
+	if err := sync.SyncAssignee(database, repo, cu, cfg.ClickUp.TeamID, *assigneeID); err != nil {
+		fmt.Fprintf(os.Stderr, "sync finished with error: %v\n", err)
+		os.Exit(1)
+	}
+	fmt.Println("Sync complete.")
 }
 
 func cmdRegisterAssignee(args []string) {
